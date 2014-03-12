@@ -1,0 +1,22 @@
+{
+  "name": "omnis.auth.mongodb",
+  "version": "0.0.1",
+  "description": "Omnis authorization plugin",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andy-inc/omnis.auth.mongodb.git"
+  },
+  "author": "Andy <andy@sumskoy.com> (http://sumskoy.com/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/andy-inc/omnis.auth.mongodb/issues"
+  },
+  "homepage": "https://github.com/andy-inc/omnis.auth.mongodb",
+  "dependencies": {
+    "bcrypt": "^0.7.7"
+  }
+}
