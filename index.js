@@ -13,7 +13,7 @@ var _config = {};
 
 module.exports = exports = function (config) {
     if (config) _config = config;
-    for(var key in defaultConfig) if (defaultConfig.hasOwnProperty(key) && _config[key] == null){
+    for (var key in defaultConfig) if (defaultConfig.hasOwnProperty(key) && _config[key] == null) {
         _config[key] = defaultConfig[key];
     }
 
@@ -111,9 +111,20 @@ module.exports = exports = function (config) {
                 update: function (key, data) {
                     var selector = {};
                     selector[_config.primary] = key;
-                    $q.ninvoke(collection, 'update', selector, {$set: data}).then(function () {
-                        return result.findOne(key);
-                    });
+                    return $q.spread([],function () {
+                        if (data.password) {
+                            return cryptPassword(data.password).then(function (password) {
+                                data.password = password;
+                                return data;
+                            });
+                        } else {
+                            return data;
+                        }
+                    }).then(function (data) {
+                            return $q.ninvoke(collection, 'update', selector, {$set: data});
+                        }).then(function () {
+                            return result.findOne(key);
+                        });
                 },
 
                 /**
@@ -122,8 +133,8 @@ module.exports = exports = function (config) {
                  * @param chars
                  * @returns {String}
                  */
-                makePassword: function(length, chars){
-                    if (chars == null){
+                makePassword: function (length, chars) {
+                    if (chars == null) {
                         chars = 'qwertyuiopasdfghjklzxcvbnm1234567890QWERTYUIOPASDFGHJKLZXCVBNM';
                     }
                     if (length == null) {
@@ -135,7 +146,7 @@ module.exports = exports = function (config) {
 
             var key = {};
             key[_config.primary] = 1;
-            return $q.ninvoke(collection, 'ensureIndex', key, {unique: true}).then(function(){
+            return $q.ninvoke(collection, 'ensureIndex', key, {unique: true}).then(function () {
                 return result;
             })
         }]
