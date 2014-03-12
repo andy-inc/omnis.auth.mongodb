@@ -11,28 +11,29 @@ var defaultConfig = {
 
 var _config = {};
 
-var model = {
-    ns: "plugins.auth.mongodb",
-    name: "model",
-    type: "module",
-    fn: function ($omnis, $application, $mongodb, $bcrypt, $crypto, $q) {
-        var cfg = $omnis.extend(true, defaultConfig, _config);
+module.exports = exports = function (config) {
+    if (config) _config = config;
+    for(var key in defaultConfig) if (defaultConfig.hasOwnProperty(key) && _config[key] == null){
+        _config[key] = defaultConfig[key];
+    }
 
-        return $application.inject(plugin.ns, [cfg.db, function (db) {
-            var collection = db.collection(cfg.collection);
 
-            var key = {};
-            key[cfg.primary] = 1;
-            collection.ensureIndex(key, {unique: true});
+    var model = {
+        require: require.bind(this),
+        ns: "plugins.auth.mongodb",
+        name: "model",
+        type: "module",
+        fn: ['$application', '$mongodb', '$bcrypt', '$crypto', '$q', _config.db, function ($application, $mongodb, $bcrypt, $crypto, $q, db) {
+            var collection = db.collection(_config.collection);
 
             var cryptPassword = function (password) {
-                return $q.ninvoke($bcrypt, 'genSalt', cfg.salt).then(function (salt) {
+                return $q.ninvoke($bcrypt, 'genSalt', _config.salt).then(function (salt) {
                     return $q.ninvoke($bcrypt, 'hash', password, salt);
                 });
             };
             var makePassword = function (length, chars) {
                 var index = (Math.random() * (chars.length - 1)).toFixed(0);
-                return length > 0 ? chars[index] + makePasswd(length - 1, chars) : '';
+                return length > 0 ? chars[index] + makePassword(length - 1, chars) : '';
             };
 
             var result = {
@@ -45,7 +46,7 @@ var model = {
                  */
                 findOne: function (key) {
                     var selector = {};
-                    selector[cfg.primary] = key;
+                    selector[_config.primary] = key;
                     return result.findOneBySelector(selector);
                 },
 
@@ -109,7 +110,7 @@ var model = {
                  */
                 update: function (key, data) {
                     var selector = {};
-                    selector[cfg.primary] = key;
+                    selector[_config.primary] = key;
                     $q.ninvoke(collection, 'update', selector, {$set: data}).then(function () {
                         return result.findOne(key);
                     });
@@ -132,47 +133,48 @@ var model = {
                 }
             };
 
-            return result;
+            var key = {};
+            key[_config.primary] = 1;
+            return $q.ninvoke(collection, 'ensureIndex', key, {unique: true}).then(function(){
+                return result;
+            })
+        }]
+    };
 
-        }])();
-    }
-};
-
-var plugin = {
-    ns: "plugins.auth.mongodb",
-    name: "middleware",
-    type: "middleware:before:router",
-    fn: function ($q, model) {
-        return function (req, res) {
-            req.user = null;
-            req.login = function (user) {
-                req.session.userId = user._id.toHexString();
-                var def = $q.defer();
-                def.resolve();
-                return def.promise;
+    var plugin = {
+        require: require.bind(this),
+        ns: "plugins.auth.mongodb",
+        name: "middleware",
+        type: "middleware:before:router",
+        fn: function ($q, model) {
+            return function (req, res) {
+                req.user = null;
+                req.login = function (user) {
+                    req.session.userId = user._id.toHexString();
+                    var def = $q.defer();
+                    def.resolve();
+                    return def.promise;
+                };
+                req.logout = function () {
+                    delete req.session.userId;
+                    var def = $q.defer();
+                    def.resolve();
+                    return def.promise;
+                };
+                var _id = (req.session || {}).userId;
+                if (!_id) return;
+                return model.findOneById(_id).then(function (user) {
+                    req.user = user || null;
+                    if (req.user) {
+                        req.user.$checkPassword = function (password) {
+                            return model.checkPassword(req.user, password);
+                        };
+                        req.user.$logout = req.logout.bind(req);
+                    }
+                });
             };
-            req.logout = function () {
-                delete req.session.userId;
-                var def = $q.defer();
-                def.resolve();
-                return def.promise;
-            };
-            var _id = (req.session || {}).userId;
-            if (!_id) return;
-            return model.findOneById(_id).then(function (user) {
-                req.user = user || null;
-                if (req.user) {
-                    req.user.$checkPassword = function (password) {
-                        return model.checkPassword(req.user, password);
-                    };
-                    req.user.$logout = req.logout.bind(req);
-                }
-            });
-        };
-    }
-};
+        }
+    };
 
-module.exports = exports = function (config) {
-    if (config) _config = config;
     return [model, plugin];
 };
